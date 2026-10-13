@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>巷口小食堂｜小吃預約點餐</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="回到首頁">
+      <span class="brand-mark">巷</span>
+      <span>
+        <strong>巷口小食堂</strong>
+        <small>小吃預約點餐</small>
+      </span>
+    </a>
+    <nav class="nav" aria-label="主要導覽">
+      <a href="#menu">菜單</a>
+      <a href="#pickup">預約</a>
+      <a href="#about">介紹</a>
+    </nav>
+  </header>
+
+  <main id="home">
+    <section class="hero">
+      <img src="assets/hero-snacks.png" alt="雞蛋糕與滷味示範圖片">
+      <div class="hero-copy">
+        <p class="eyebrow">脆皮雞蛋糕｜每日限量滷味</p>
+        <h1>想吃巷口小點，先點好再來拿。</h1>
+        <p>先選雞蛋糕與每日限量滷味，留下取餐時間，到了再來帶走。目前為家人預覽版，操作不會送出真實訂單。</p>
+        <div class="hero-actions">
+          <a class="primary-link" href="#menu">開始看菜單</a>
+          <a class="ghost-link" href="#line">LINE 群組</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="notice" aria-label="示範提醒">
+      <strong>家人預覽版</strong>
+      <span>可體驗菜單、購物車與預約取餐流程；目前不會送出真實訂單或 LINE 通知。</span>
+    </section>
+
+    <section class="section" id="menu">
+      <div class="section-heading">
+        <p class="eyebrow">Menu</p>
+        <h2>今日菜單</h2>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="菜單分類">
+        <button class="tab active" type="button" data-filter="all">全部</button>
+        <button class="tab" type="button" data-filter="cake">雞蛋糕</button>
+        <button class="tab" type="button" data-filter="luwei">滷味</button>
+      </div>
+
+      <div class="menu-grid" id="menuGrid" aria-live="polite"></div>
+    </section>
+
+    <section class="section cart-section" id="cart">
+      <div class="section-heading">
+        <p class="eyebrow">Cart</p>
+        <h2>購物車</h2>
+      </div>
+      <div class="cart-panel">
+        <div id="cartItems" class="cart-items"></div>
+        <div class="cart-summary">
+          <span>小計</span>
+          <strong id="cartTotal">NT$0</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="section pickup-section" id="pickup">
+      <div class="section-heading">
+        <p class="eyebrow">Pickup</p>
+        <h2>預約取餐</h2>
+      </div>
+      <form class="pickup-form" id="pickupForm">
+        <label>
+          姓名或暱稱
+          <input name="name" type="text" placeholder="例如：小白" required>
+        </label>
+        <label>
+          手機末三碼
+          <input name="phone" type="text" inputmode="numeric" maxlength="3" placeholder="例如：168" required>
+        </label>
+        <fieldset class="time-field">
+          <legend>預約取餐時間</legend>
+          <div class="time-selects">
+            <label>
+              時
+              <select name="pickupHour" id="pickupHour" required></select>
+            </label>
+            <label>
+              分
+              <select name="pickupMinute" id="pickupMinute" required></select>
+            </label>
+          </div>
+        </fieldset>
+        <label>
+          備註
+          <textarea name="note" rows="3" placeholder="例如：滷味不要辣、雞蛋糕分開裝"></textarea>
+        </label>
+        <button class="submit-btn" type="submit">確認預約取餐</button>
+        <p class="form-note" id="formNote">家人預覽版：不會送出真實訂單或 LINE 通知。</p>
+      </form>
+    </section>
+
+    <section class="section about-section" id="about">
+      <div class="section-heading">
+        <p class="eyebrow">About</p>
+        <h2>店家介紹</h2>
+      </div>
+      <div class="about-copy">
+        <p>巷口小食堂主打剛出爐的脆皮雞蛋糕，以及每日限量準備的滷味。適合放學、下班、散步時順手帶走。</p>
+        <p>網站流程以手機為主，讓客人快速看菜單、調整數量、知道小計，並選擇預約取餐時間。</p>
+      </div>
+    </section>
+
+    <section class="section line-section" id="line">
+      <div>
+        <p class="eyebrow">LINE Group</p>
+        <h2>LINE 群組</h2>
+        <p>想更快知道今日品項、售完提醒或臨時公告，可以從這裡加入 LINE 群組。</p>
+      </div>
+      <a class="line-btn" href="https://line.me/ti/g/hE2gRwhzK9" target="_blank" rel="noopener">加入 LINE 群組</a>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
