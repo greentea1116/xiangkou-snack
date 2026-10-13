@@ -162,8 +162,10 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-document.querySelector("#pickupForm").addEventListener("submit", (event) => {
+document.querySelector("#pickupForm").addEventListener("submit", async (event) => {
   event.preventDefault();
+  const formElement = event.currentTarget;
+  const submitButton = formElement.querySelector('button[type="submit"]');
   const count = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
   if (count === 0) {
     showToast("請先加入至少一項商品，再確認預約取餐。");
@@ -176,25 +178,61 @@ document.querySelector("#pickupForm").addEventListener("submit", (event) => {
     return;
   }
 
-  const form = new FormData(event.currentTarget);
-  const name = form.get("name");
-  const pickupTime = `今天 ${form.get("pickupHour")}:${form.get("pickupMinute")}`;
+  const form = new FormData(formElement);
   const rows = getCartRows();
   const total = rows.reduce((sum, row) => sum + row.subtotal, 0);
-  const demoId = `PREVIEW-${Date.now().toString().slice(-6)}`;
+  const pickupTime = `今天 ${form.get("pickupHour")}:${form.get("pickupMinute")}`;
+  const order = {
+    id: `XK${Date.now().toString().slice(-8)}`,
+    createdAt: new Date().toLocaleString("zh-TW", { hour12: false }),
+    name: String(form.get("name")).trim(),
+    phone: String(form.get("phone")).trim(),
+    pickupTime,
+    note: String(form.get("note") || "無").trim() || "無",
+    items: rows.map(({ name, price, quantity, subtotal }) => ({ name, price, quantity, subtotal })),
+    total
+  };
+  const apiBaseUrl = window.XIANGKOU_CONFIG?.API_BASE_URL;
+  if (!apiBaseUrl) {
+    showToast("訂單通知尚未設定，請稍後再試。");
+    return;
+  }
 
-  Object.entries(cart).forEach(([id, quantity]) => {
-    if (typeof stock[id] === "number") {
-      stock[id] = Math.max(0, stock[id] - quantity);
+  submitButton.disabled = true;
+  submitButton.textContent = "送出中…";
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(order)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error("訂單通知服務暫時無法使用");
     }
-    delete cart[id];
-  });
-  saveStock();
+    if (result.lineNotified !== true) {
+      showToast("訂單資料已到達後端，但 LINE 尚未確認通知。請先查看官方 LINE，避免重複送單。");
+      return;
+    }
 
-  renderMenu();
-  renderCart();
-  event.currentTarget.reset();
-  showToast(`展示流程完成，模擬單號 ${demoId}。取餐時間：${pickupTime}，總金額 ${money(total)}。訂單未送到店家，也未通知 LINE。`);
+    Object.entries(cart).forEach(([id, quantity]) => {
+      if (typeof stock[id] === "number") {
+        stock[id] = Math.max(0, stock[id] - quantity);
+      }
+      delete cart[id];
+    });
+    localStorage.setItem("xiangkouStock", JSON.stringify(stock));
+    renderMenu();
+    renderCart();
+    formElement.reset();
+    showToast(`${order.name} 的預約已通知店家 LINE：${pickupTime} 取餐，總金額 ${money(total)}。`);
+  } catch (error) {
+    console.warn(error);
+    showToast("目前無法確認訂單是否送達，請先查看官方 LINE，再決定是否重送。");
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "確認預約取餐";
+  }
 });
 
 renderMenu();
