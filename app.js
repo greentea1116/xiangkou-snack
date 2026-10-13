@@ -24,7 +24,7 @@ const products = [
     id: "limited-luwei",
     category: "luwei",
     name: "每日限量滷味",
-    desc: "每日依現場備料搭配，售完為止。示範內容可再改成固定品項。",
+    desc: "每日新鮮滷製，品項依當日供應為準。",
     price: 100
   }
 ];
@@ -37,7 +37,6 @@ const menuGrid = document.querySelector("#menuGrid");
 const cartItems = document.querySelector("#cartItems");
 const cartTotal = document.querySelector("#cartTotal");
 const toast = document.querySelector("#toast");
-const apiBaseUrl = window.XIANGKOU_CONFIG?.API_BASE_URL || "";
 const pickupHour = document.querySelector("#pickupHour");
 const pickupMinute = document.querySelector("#pickupMinute");
 
@@ -49,7 +48,7 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("show");
   window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 3200);
+  showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 4800);
 }
 
 function setQuantity(id, nextQuantity) {
@@ -68,30 +67,6 @@ function setQuantity(id, nextQuantity) {
 
 function saveStock() {
   localStorage.setItem("xiangkouStock", JSON.stringify(stock));
-}
-
-function saveOrder(order) {
-  const orders = JSON.parse(localStorage.getItem("xiangkouOrders") || "[]");
-  orders.unshift(order);
-  localStorage.setItem("xiangkouOrders", JSON.stringify(orders.slice(0, 30)));
-}
-
-async function sendOrderToBackend(order) {
-  if (!apiBaseUrl) {
-    return { sent: false, reason: "API_BASE_URL is not set" };
-  }
-
-  const response = await fetch(`${apiBaseUrl}/api/orders`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(order)
-  });
-
-  if (!response.ok) {
-    throw new Error("訂單通知後端暫時無法使用");
-  }
-
-  return response.json();
 }
 
 function getCartRows() {
@@ -187,7 +162,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-document.querySelector("#pickupForm").addEventListener("submit", async (event) => {
+document.querySelector("#pickupForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const count = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
   if (count === 0) {
@@ -200,25 +175,14 @@ document.querySelector("#pickupForm").addEventListener("submit", async (event) =
     showToast(`${product.name} 庫存不足，請調整數量。`);
     return;
   }
+
   const form = new FormData(event.currentTarget);
+  const name = form.get("name");
+  const pickupTime = `今天 ${form.get("pickupHour")}:${form.get("pickupMinute")}`;
   const rows = getCartRows();
   const total = rows.reduce((sum, row) => sum + row.subtotal, 0);
-  const pickupTime = `今天 ${form.get("pickupHour")}:${form.get("pickupMinute")}`;
-  const order = {
-    id: `XK${Date.now().toString().slice(-8)}`,
-    createdAt: new Date().toLocaleString("zh-TW", { hour12: false }),
-    name: form.get("name"),
-    phone: form.get("phone"),
-    pickupTime,
-    note: form.get("note") || "無",
-    items: rows.map((row) => ({
-      name: row.name,
-      price: row.price,
-      quantity: row.quantity,
-      subtotal: row.subtotal
-    })),
-    total
-  };
+  const demoId = `PREVIEW-${Date.now().toString().slice(-6)}`;
+
   Object.entries(cart).forEach(([id, quantity]) => {
     if (typeof stock[id] === "number") {
       stock[id] = Math.max(0, stock[id] - quantity);
@@ -226,17 +190,11 @@ document.querySelector("#pickupForm").addEventListener("submit", async (event) =
     delete cart[id];
   });
   saveStock();
-  saveOrder(order);
-  try {
-    await sendOrderToBackend(order);
-  } catch (error) {
-    console.warn(error);
-  }
+
   renderMenu();
   renderCart();
   event.currentTarget.reset();
-  const notice = "這是家人預覽版，沒有送出真實訂單。";
-  showToast(`${order.name} 的預約已建立：${order.pickupTime} 取餐，總金額 ${money(order.total)}。${notice}`);
+  showToast(`展示流程完成，模擬單號 ${demoId}。取餐時間：${pickupTime}，總金額 ${money(total)}。訂單未送到店家，也未通知 LINE。`);
 });
 
 renderMenu();
