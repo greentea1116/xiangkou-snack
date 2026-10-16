@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>購物車｜巷口小食堂</title><link rel="stylesheet" href="styles.css"></head><body data-category="">
+<header class="topbar"><a class="brand" href="index.html"><span class="brand-mark">巷</span><span><strong>巷口小食堂</strong><small>籌備中・測試點餐</small></span></a><a class="cart-link" href="cart.html" data-cart-summary>購物車 0 件 · NT$0</a></header>
+<nav class="category-nav" aria-label="餐點分類"><a href="cake.html" >雞蛋糕</a><a href="luwei.html" >滷味</a><a href="oden.html" >關東煮</a></nav>
+<div class="notice"><strong>籌備中・尚未營業</strong><span>目前僅供測試送單與 LINE 通知，不安排製作或取餐。</span></div><main>    <section class="section cart-section" id="cart">
+      <div class="section-heading">
+        <p class="eyebrow">Cart</p>
+        <h2>我的餐點試算</h2>
+      </div>
+      <div class="cart-panel">
+        <div id="cartItems" class="cart-items"></div>
+        <div class="cart-summary">
+          <span>小計</span>
+          <strong id="cartTotal">NT$0</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="section pickup-section" id="pickup">
+      <div class="section-heading">
+        <p class="eyebrow">Pickup</p>
+        <h2>營業與取餐資訊</h2>
+      </div>
+      <div class="opening-info">
+        <p><strong>籌備中・測試送單已開放</strong></p>
+        <p>開幕日期：待公告<br>取餐地點：待公告<br>營業時間：待公告</p>
+        <p>以下表單會發送測試訂單與 LINE 通知，不代表正式接單。請填測試暱稱與手機末三碼，勿填完整電話。</p>
+      </div>
+      <form class="pickup-form" id="pickupForm">
+        <label>
+          姓名或暱稱
+          <input name="name" type="text" placeholder="例如：小白" required>
+        </label>
+        <label>
+          手機末三碼
+          <input name="phone" type="text" inputmode="numeric" maxlength="3" placeholder="例如：168" required>
+        </label>
+        <fieldset class="time-field">
+          <legend>預約取餐時間</legend>
+          <div class="time-selects">
+            <label>
+              時
+              <select name="pickupHour" id="pickupHour" required></select>
+            </label>
+            <label>
+              分
+              <select name="pickupMinute" id="pickupMinute" required></select>
+            </label>
+          </div>
+        </fieldset>
+        <label>
+          備註
+          <textarea name="note" rows="3" placeholder="例如：滷味不要辣、雞蛋糕分開裝"></textarea>
+        </label>
+        <button class="submit-btn" type="submit">送出測試訂單</button>
+        <p class="form-note" id="formNote">此表單會將暱稱、手機末三碼、餐點與備註傳送給店家作測試通知。目前尚未營業，測試單不安排製作或取餐。</p>
+      </form>
+    </section>
+
+</main><footer class="site-footer">巷口小食堂｜開幕日期、地點與營業時間待公告。<br><a href="https://line.me/ti/g/hE2gRwhzK9" target="_blank" rel="noopener">加入 LINE 群組</a></footer><div class="toast" id="toast" role="status"></div><script src="config.js"></script><script src="menu.js"></script><script src="app.js"></script></body></html>

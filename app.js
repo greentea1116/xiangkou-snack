@@ -1,42 +1,19 @@
-const products = [
-  {
-    id: "crispy-original-cake",
-    category: "cake",
-    name: "原味脆皮雞蛋糕",
-    desc: "外層薄脆、內裡鬆軟，經典原味最耐吃。",
-    price: 50
-  },
-  {
-    id: "crispy-matcha-cake",
-    category: "cake",
-    name: "抹茶脆皮雞蛋糕",
-    desc: "淡淡茶香搭配脆皮口感，甜度清爽。",
-    price: 60
-  },
-  {
-    id: "crispy-chocolate-cake",
-    category: "cake",
-    name: "巧克力脆皮雞蛋糕",
-    desc: "濃郁巧克力香，適合想吃甜一點的時候。",
-    price: 60
-  },
-  {
-    id: "limited-luwei",
-    category: "luwei",
-    name: "每日限量滷味",
-    desc: "每日新鮮滷製，品項依當日供應為準。",
-    price: 100
-  }
-];
+const products = window.XIANGKOU_PRODUCTS;
 
-const cart = {};
+let cart;
+try { cart = JSON.parse(localStorage.getItem("xiangkouCart") || "{}"); } catch { cart = {}; }
+if (!cart || typeof cart !== "object" || Array.isArray(cart)) cart = {};
+Object.keys(cart).forEach((id) => {
+  if (!products.some((p) => p.id === id) || !Number.isSafeInteger(cart[id]) || cart[id] < 1) delete cart[id];
+});
 const stock = JSON.parse(localStorage.getItem("xiangkouStock") || '{"limited-luwei":12}');
-let filter = "all";
+let filter = document.body.dataset.category || "cake";
 
 const menuGrid = document.querySelector("#menuGrid");
 const cartItems = document.querySelector("#cartItems");
 const cartTotal = document.querySelector("#cartTotal");
 const toast = document.querySelector("#toast");
+const apiBaseUrl = window.XIANGKOU_CONFIG?.API_BASE_URL || "";
 const pickupHour = document.querySelector("#pickupHour");
 const pickupMinute = document.querySelector("#pickupMinute");
 
@@ -48,13 +25,13 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("show");
   window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 4800);
+  showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
 function setQuantity(id, nextQuantity) {
   const available = stock[id];
   if (typeof available === "number" && nextQuantity > available) {
-    showToast(`每日限量滷味目前只剩 ${available} 份。`);
+    showToast(`${products.find((product) => product.id === id).name} 目前只剩 ${available} 份。`);
     return;
   }
   cart[id] = Math.max(0, nextQuantity);
@@ -63,10 +40,35 @@ function setQuantity(id, nextQuantity) {
   }
   renderMenu();
   renderCart();
+  localStorage.setItem("xiangkouCart", JSON.stringify(cart));
 }
 
 function saveStock() {
   localStorage.setItem("xiangkouStock", JSON.stringify(stock));
+}
+
+function saveOrder(order) {
+  const orders = JSON.parse(localStorage.getItem("xiangkouOrders") || "[]");
+  orders.unshift(order);
+  localStorage.setItem("xiangkouOrders", JSON.stringify(orders.slice(0, 30)));
+}
+
+async function sendOrderToBackend(order) {
+  if (!apiBaseUrl) {
+    return { sent: false, reason: "API_BASE_URL is not set" };
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/orders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(order)
+  });
+
+  if (!response.ok) {
+    throw new Error("訂單通知後端暫時無法使用");
+  }
+
+  return response.json();
 }
 
 function getCartRows() {
@@ -77,6 +79,7 @@ function getCartRows() {
 }
 
 function renderPickupTimeOptions() {
+  if (!pickupHour || !pickupMinute) return;
   pickupHour.innerHTML = `<option value="">時</option>`;
   for (let hour = 15; hour <= 19; hour += 1) {
     const label = `${String(hour).padStart(2, "0")} 時`;
@@ -91,6 +94,7 @@ function renderPickupTimeOptions() {
 }
 
 function renderMenu() {
+  if (!menuGrid) return;
   const visibleProducts = products.filter((product) => filter === "all" || product.category === filter);
   menuGrid.innerHTML = visibleProducts.map((product) => {
     const quantity = cart[product.id] || 0;
@@ -107,7 +111,7 @@ function renderMenu() {
             <h3 class="item-name">${product.name}</h3>
             <p class="item-desc">${product.desc}</p>
           </div>
-          <span class="price">${money(product.price)}</span>
+          <span class="price">${money(product.price)}<small>／${product.unit}</small></span>
         </div>
         ${stockLabel}
         <div class="quantity">
@@ -125,6 +129,11 @@ function renderMenu() {
 
 function renderCart() {
   const rows = getCartRows();
+  const total = rows.reduce((sum, row) => sum + row.subtotal, 0);
+  document.querySelectorAll("[data-cart-summary]").forEach((element) => {
+    element.textContent = `購物車 ${rows.reduce((sum, row) => sum + row.quantity, 0)} 件 · ${money(total)}`;
+  });
+  if (!cartItems) return;
 
   if (rows.length === 0) {
     cartItems.innerHTML = `<p class="cart-empty">目前尚未加入商品。選好後會在這裡看到小計。</p>`;
@@ -139,14 +148,18 @@ function renderCart() {
         <small>${money(row.price)} × ${row.quantity}</small>
       </div>
       <strong>${money(row.subtotal)}</strong>
+      <div class="stepper">
+        <button type="button" data-action="decrease" data-id="${row.id}" aria-label="減少 ${row.name}">−</button>
+        <span>${row.quantity}</span>
+        <button type="button" data-action="increase" data-id="${row.id}" aria-label="增加 ${row.name}">＋</button>
+      </div>
     </div>
   `).join("");
 
-  const total = rows.reduce((sum, row) => sum + row.subtotal, 0);
   cartTotal.textContent = money(total);
 }
 
-document.querySelector("#menuGrid").addEventListener("click", (event) => {
+document.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
   const productId = button.dataset.id;
@@ -162,10 +175,9 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-document.querySelector("#pickupForm").addEventListener("submit", async (event) => {
+document.querySelector("#pickupForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const formElement = event.currentTarget;
-  const submitButton = formElement.querySelector('button[type="submit"]');
+  const pickupForm = event.currentTarget;
   const count = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
   if (count === 0) {
     showToast("請先加入至少一項商品，再確認預約取餐。");
@@ -177,62 +189,54 @@ document.querySelector("#pickupForm").addEventListener("submit", async (event) =
     showToast(`${product.name} 庫存不足，請調整數量。`);
     return;
   }
-
-  const form = new FormData(formElement);
+  const form = new FormData(event.currentTarget);
   const rows = getCartRows();
   const total = rows.reduce((sum, row) => sum + row.subtotal, 0);
   const pickupTime = `今天 ${form.get("pickupHour")}:${form.get("pickupMinute")}`;
   const order = {
     id: `XK${Date.now().toString().slice(-8)}`,
     createdAt: new Date().toLocaleString("zh-TW", { hour12: false }),
-    name: String(form.get("name")).trim(),
-    phone: String(form.get("phone")).trim(),
+    name: form.get("name"),
+    phone: form.get("phone"),
     pickupTime,
-    note: String(form.get("note") || "無").trim() || "無",
-    items: rows.map(({ name, price, quantity, subtotal }) => ({ name, price, quantity, subtotal })),
+    note: "【籌備中測試單，請勿製作】" + (form.get("note") || "無"),
+    items: rows.map((row) => ({
+      name: row.name,
+      price: row.price,
+      quantity: row.quantity,
+      subtotal: row.subtotal
+    })),
     total
   };
-  const apiBaseUrl = window.XIANGKOU_CONFIG?.API_BASE_URL;
-  if (!apiBaseUrl) {
-    showToast("訂單通知尚未設定，請稍後再試。");
-    return;
-  }
-
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+  if (submitButton.disabled) return;
   submitButton.disabled = true;
-  submitButton.textContent = "送出中…";
+  submitButton.textContent = "測試訂單傳送中…";
+  let result;
   try {
-    const response = await fetch(`${apiBaseUrl}/api/orders`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(order)
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error("訂單通知服務暫時無法使用");
-    }
-    if (result.lineNotified !== true) {
-      showToast("訂單資料已到達後端，但 LINE 尚未確認通知。請先查看官方 LINE，避免重複送單。");
-      return;
-    }
-
-    Object.entries(cart).forEach(([id, quantity]) => {
-      if (typeof stock[id] === "number") {
-        stock[id] = Math.max(0, stock[id] - quantity);
-      }
-      delete cart[id];
-    });
-    localStorage.setItem("xiangkouStock", JSON.stringify(stock));
-    renderMenu();
-    renderCart();
-    formElement.reset();
-    showToast(`${order.name} 的預約已通知店家 LINE：${pickupTime} 取餐，總金額 ${money(total)}。`);
+    result = await sendOrderToBackend(order);
+    if (!result.sent && !result.ok) throw new Error("後端尚未確認收單");
   } catch (error) {
-    console.warn(error);
-    showToast("目前無法確認訂單是否送達，請先查看官方 LINE，再決定是否重送。");
+    showToast("送單未成功，已保留餐點，請稍後重試。");
+    return;
   } finally {
     submitButton.disabled = false;
-    submitButton.textContent = "確認預約取餐";
+    submitButton.textContent = "送出測試訂單";
   }
+  Object.entries(cart).forEach(([id, quantity]) => {
+    if (typeof stock[id] === "number") {
+      stock[id] = Math.max(0, stock[id] - quantity);
+    }
+    delete cart[id];
+  });
+  saveStock();
+  localStorage.setItem("xiangkouCart", JSON.stringify(cart));
+  saveOrder(order);
+  renderMenu();
+  renderCart();
+  pickupForm.reset();
+  const notice = result.lineNotified ? "LINE 通知已送出。" : "後端已收單，但 LINE 通知未確認。";
+  showToast(`測試單已建立，總金額 ${money(order.total)}。${notice} 籌備中，請勿前往取餐。`);
 });
 
 renderMenu();
