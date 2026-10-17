@@ -6,7 +6,35 @@ if (!cart || typeof cart !== "object" || Array.isArray(cart)) cart = {};
 Object.keys(cart).forEach((id) => {
   if (!products.some((p) => p.id === id) || !Number.isSafeInteger(cart[id]) || cart[id] < 1) delete cart[id];
 });
-const stock = JSON.parse(localStorage.getItem("xiangkouStock") || '{"limited-luwei":12}');
+const stock = {};
+let inventoryReady = !window.XIANGKOU_CONFIG?.INVENTORY_ENABLED;
+let refreshing = false;
+let submitting = false;
+async function refreshInventory() {
+  if (!window.XIANGKOU_CONFIG?.INVENTORY_ENABLED || refreshing || submitting) return;
+  refreshing = true;
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/catalog`, { cache: "no-store" });
+    if (!response.ok) throw new Error("庫存連線失敗");
+    const data = await response.json();
+    if (!Array.isArray(data.products) || !data.products.length) throw new Error("庫存資料不完整");
+    for (const product of products) {
+      const live = data.products.find((p) => p.id === product.id);
+      product.enabled = live?.enabled === true;
+      stock[product.id] = live?.remaining ?? undefined;
+    }
+    inventoryReady = true;
+    const status = document.querySelector("#inventoryStatus");
+    if (status) status.textContent = "庫存已同步";
+  } catch {
+    inventoryReady = false;
+    const status = document.querySelector("#inventoryStatus");
+    if (status) status.textContent = "暫時無法同步庫存，請稍後重試";
+  } finally {
+    refreshing = false;
+    renderMenu(); renderCart();
+  }
+}
 let filter = document.body.dataset.category || "cake";
 
 const menuGrid = document.querySelector("#menuGrid");
@@ -16,6 +44,14 @@ const toast = document.querySelector("#toast");
 const apiBaseUrl = window.XIANGKOU_CONFIG?.API_BASE_URL || "";
 const pickupHour = document.querySelector("#pickupHour");
 const pickupMinute = document.querySelector("#pickupMinute");
+if (window.XIANGKOU_CONFIG?.INVENTORY_ENABLED) {
+  const status = document.createElement("p");
+  status.id = "inventoryStatus";
+  status.className = "inventory-status";
+  status.setAttribute("role", "status");
+  status.textContent = "庫存連線中…";
+  document.querySelector(".notice")?.append(status);
+}
 
 function money(value) {
   return `NT$${value}`;
@@ -29,6 +65,10 @@ function showToast(message) {
 }
 
 function setQuantity(id, nextQuantity) {
+  if (submitting) return;
+  if (nextQuantity > (cart[id] || 0) && (!inventoryReady || products.find((p) => p.id === id)?.enabled === false)) {
+    showToast("此品項暫停供應或庫存尚未連線。"); return;
+  }
   const available = stock[id];
   if (typeof available === "number" && nextQuantity > available) {
     showToast(`${products.find((product) => product.id === id).name} 目前只剩 ${available} 份。`);
@@ -64,11 +104,9 @@ async function sendOrderToBackend(order) {
     body: JSON.stringify(order)
   });
 
-  if (!response.ok) {
-    throw new Error("訂單通知後端暫時無法使用");
-  }
-
-  return response.json();
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "訂單通知後端暫時無法使用");
+  return result;
 }
 
 function getCartRows() {
@@ -100,10 +138,10 @@ function renderMenu() {
     const quantity = cart[product.id] || 0;
     const available = stock[product.id];
     const hasStockLimit = typeof available === "number";
-    const soldOut = hasStockLimit && available === 0;
+    const soldOut = product.enabled === false || hasStockLimit && available === 0;
     const stockLabel = hasStockLimit
-      ? `<span class="stock-badge ${soldOut ? "empty" : ""}">${soldOut ? "已售完" : `剩 ${available} 份`}</span>`
-      : "";
+      ? `<span class="stock-badge ${soldOut ? "empty" : ""}">${product.enabled === false ? "暫停供應" : soldOut ? "已售完" : `剩 ${available} ${product.unit}`}</span>`
+      : product.enabled === false ? '<span class="stock-badge empty">暫停供應</span>' : "";
     return `
       <article class="item-card ${soldOut ? "sold-out" : ""}">
         <div class="item-top">
@@ -119,7 +157,7 @@ function renderMenu() {
           <div class="stepper" aria-label="${product.name} 數量">
             <button type="button" data-action="decrease" data-id="${product.id}" aria-label="減少 ${product.name}">−</button>
             <span>${quantity}</span>
-            <button type="button" data-action="increase" data-id="${product.id}" aria-label="增加 ${product.name}" ${soldOut || quantity >= available ? "disabled" : ""}>＋</button>
+            <button type="button" data-action="increase" data-id="${product.id}" aria-label="增加 ${product.name}" ${!inventoryReady || soldOut || quantity >= available ? "disabled" : ""}>＋</button>
           </div>
         </div>
       </article>
@@ -178,6 +216,11 @@ document.querySelectorAll(".tab").forEach((tab) => {
 document.querySelector("#pickupForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const pickupForm = event.currentTarget;
+  if (submitting) return;
+  await refreshInventory();
+  if (!inventoryReady || Object.keys(cart).some((id) => products.find((p) => p.id === id)?.enabled === false)) {
+    showToast("庫存尚未連線或餐點已停售，請調整餐點後再送單。"); return;
+  }
   const count = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
   if (count === 0) {
     showToast("請先加入至少一項商品，再確認預約取餐。");
@@ -194,13 +237,14 @@ document.querySelector("#pickupForm")?.addEventListener("submit", async (event) 
   const total = rows.reduce((sum, row) => sum + row.subtotal, 0);
   const pickupTime = `今天 ${form.get("pickupHour")}:${form.get("pickupMinute")}`;
   const order = {
-    id: `XK${Date.now().toString().slice(-8)}`,
+    id: crypto.randomUUID(),
     createdAt: new Date().toLocaleString("zh-TW", { hour12: false }),
     name: form.get("name"),
     phone: form.get("phone"),
     pickupTime,
     note: "【籌備中測試單，請勿製作】" + (form.get("note") || "無"),
     items: rows.map((row) => ({
+      id: row.id,
       name: row.name,
       price: row.price,
       quantity: row.quantity,
@@ -210,6 +254,11 @@ document.querySelector("#pickupForm")?.addEventListener("submit", async (event) 
   };
   const submitButton = event.currentTarget.querySelector('button[type="submit"]');
   if (submitButton.disabled) return;
+  const signature = JSON.stringify([order.name, order.phone, order.pickupTime, order.note, order.items]);
+  const pending = JSON.parse(sessionStorage.getItem("xiangkouPendingOrder") || "null");
+  if (pending?.signature === signature) order.id = pending.id;
+  sessionStorage.setItem("xiangkouPendingOrder", JSON.stringify({ signature, id: order.id }));
+  submitting = true;
   submitButton.disabled = true;
   submitButton.textContent = "測試訂單傳送中…";
   let result;
@@ -217,9 +266,10 @@ document.querySelector("#pickupForm")?.addEventListener("submit", async (event) 
     result = await sendOrderToBackend(order);
     if (!result.sent && !result.ok) throw new Error("後端尚未確認收單");
   } catch (error) {
-    showToast("送單未成功，已保留餐點，請稍後重試。");
+    showToast(error.message + " 已保留餐點。");
     return;
   } finally {
+    submitting = false;
     submitButton.disabled = false;
     submitButton.textContent = "送出測試訂單";
   }
@@ -229,12 +279,13 @@ document.querySelector("#pickupForm")?.addEventListener("submit", async (event) 
     }
     delete cart[id];
   });
-  saveStock();
+  sessionStorage.removeItem("xiangkouPendingOrder");
   localStorage.setItem("xiangkouCart", JSON.stringify(cart));
   saveOrder(order);
   renderMenu();
   renderCart();
   pickupForm.reset();
+  await refreshInventory();
   const notice = result.lineNotified ? "LINE 通知已送出。" : "後端已收單，但 LINE 通知未確認。";
   showToast(`測試單已建立，總金額 ${money(order.total)}。${notice} 籌備中，請勿前往取餐。`);
 });
@@ -242,3 +293,7 @@ document.querySelector("#pickupForm")?.addEventListener("submit", async (event) 
 renderMenu();
 renderCart();
 renderPickupTimeOptions();
+refreshInventory();
+setInterval(refreshInventory, 15000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshInventory(); });
+window.addEventListener("pageshow", refreshInventory);

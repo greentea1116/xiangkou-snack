@@ -16,6 +16,12 @@
 }
 
 [hidden] { display: none !important; }
+.inventory-status { margin:0; font-size:13px; color:var(--muted); }
+.switch-label { display:flex; align-items:center; gap:10px; }
+.switch-label input { width:22px; height:22px; }
+.inventory-form h3, .inventory-form p { margin:0; }
+#products { margin:24px 0 40px; }
+#orders { display:grid; gap:16px; }
 .category-nav { display:flex; justify-content:center; gap:24px; padding:16px; border-bottom:1px solid var(--line); }
 .category-nav a, .cart-link { color:var(--caramel-dark); text-decoration:none; font-weight:700; }
 .category-nav a[aria-current] { border-bottom:3px solid var(--caramel); }

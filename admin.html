@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>店家管理｜巷口小食堂</title><link rel="stylesheet" href="styles.css"></head>
+<body><header class="topbar"><a class="brand" href="index.html">巷口小食堂</a><strong>店家管理</strong><button id="logout" hidden>登出</button></header>
+<main class="section">
+<form id="loginForm" class="pickup-form"><label>管理密碼<input type="password" name="password" autocomplete="current-password" required></label><button class="submit-btn">登入</button></form>
+<p id="status" role="status"></p>
+<section id="management" hidden><h1 class="page-title">餐點供應與庫存</h1>
+<div class="hero-actions"><label>分類<select id="category"><option value="">全部</option><option value="cake">雞蛋糕</option><option value="luwei">滷味</option><option value="oden">關東煮</option></select></label><button class="stock-btn secondary" id="refresh">重新整理</button></div>
+<div class="menu-grid" id="products"></div>
+<h2>最近訂單</h2><div id="orders"></div></section></main>
+<script src="config.js"></script><script src="admin.js"></script></body></html>
